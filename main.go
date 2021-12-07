@@ -18,5 +18,5 @@ func main() {
 	usecase := usecase.NewUserUsecase(repo)
 	delivery.NewUserDelivery(r, usecase)
 	fmt.Println("starting server at localhost :8080")
-	http.ListenAndServe(":8080", r)
+	http.ListenAndServe(config.PORT, r)
 }

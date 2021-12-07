@@ -10,6 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const PORT = ":8080"
+
 func GetConfig() (config map[string]string) {
 	conf, err := godotenv.Read()
 	if err != nil {
