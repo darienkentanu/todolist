@@ -3,20 +3,21 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"todolist/config"
+	"todolist/constants"
 	"todolist/delivery"
 	"todolist/repository"
 	"todolist/usecase"
+	"todolist/util"
 
 	"github.com/gorilla/mux"
 )
 
 func main() {
 	r := mux.NewRouter()
-	db := config.InitDB()
+	db := util.InitDB()
 	repo := repository.NewUserRepo(db)
 	usecase := usecase.NewUserUsecase(repo)
-	delivery.NewUserDelivery(r, usecase)
+	_ = delivery.NewUserDelivery(r, usecase)
 	fmt.Println("starting server at localhost :8080")
-	http.ListenAndServe(config.PORT, r)
+	http.ListenAndServe(constants.PORT, r)
 }

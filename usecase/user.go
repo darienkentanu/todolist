@@ -2,26 +2,27 @@ package usecase
 
 import (
 	"errors"
+	"net/http"
 	"todolist/helper"
 	"todolist/jwts"
 	"todolist/model"
 	"todolist/repository"
 )
 
-type UserImplementation interface {
+type UserUsecase interface {
 	Register(user model.User) (model.User, error)
-	VerifyUserPassword(email string, password string) (token string, err error)
+	VerifyUserPassword(w http.ResponseWriter, r *http.Request, email string, password string) (token, message string, err error)
 }
 
-type UserUsecase struct {
-	repo repository.UserDB
+type userUsecase struct {
+	repo repository.UserRepo
 }
 
-func NewUserUsecase(repo *repository.UserDB) *UserUsecase {
-	return &UserUsecase{repo: *repo}
+func NewUserUsecase(repo repository.UserRepo) *userUsecase {
+	return &userUsecase{repo: repo}
 }
 
-func (uc *UserUsecase) Register(user model.User) (model.User, error) {
+func (uc *userUsecase) Register(user model.User) (model.User, error) {
 	pwd, err := helper.GenerateHashPassword(user.Password)
 	if err != nil {
 		return model.User{}, err
@@ -34,27 +35,32 @@ func (uc *UserUsecase) Register(user model.User) (model.User, error) {
 	return u, nil
 }
 
-func (uc *UserUsecase) VerifyUserPassword(email string, password string) (token string, err error) {
+func (uc *userUsecase) VerifyUserPassword(w http.ResponseWriter, r *http.Request, email string, password string) (token, message string, err error) {
 	exist := uc.repo.CheckUserByEmail(email)
 	if !exist {
-		return "", err
+		return "", "", err
 	}
 	userID, err := uc.repo.GetUserIDByEmail(email)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	hash, err := uc.repo.GetPasswordHash(email)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	ok := helper.CheckPasswordHash(password, hash)
 	if !ok {
-		return "", errors.New("invalid password")
+		return "", "", errors.New("invalid password")
 	}
+	// token, err = jwts.ExtractTokenUserID(r)
+	// if err == nil {
+	// 	return token, "token exist", nil
+	// }
+	message = helper.RemoveCookie(w)
 	token, err = jwts.CreateToken(userID)
 	if err != nil {
-		return "", err
+		return "", message, err
 	}
-	uc.repo.UpdateToken(email, token)
-	return token, nil
+	// uc.repo.UpdateToken(email, token)
+	return token, message, nil
 }

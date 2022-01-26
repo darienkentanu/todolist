@@ -2,18 +2,15 @@ package jwts
 
 import (
 	"fmt"
-	"time"
+	"net/http"
+	"todolist/constants"
 
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
 type M map[string]interface{}
 
-const APPLICATION_NAME = "Todolist"
-const LOGIN_EXPIRATION_DURATION = time.Duration(time.Hour * 2)
 const JWT_SIGNATURE_KEY = "rahasia"
-
-var JWT_SIGNING_METHOD = jwt.SigningMethodHS256
 
 type MyClaims struct {
 	jwt.StandardClaims
@@ -26,7 +23,7 @@ func CreateToken(userID uint) (string, error) {
 
 	claims["authorized"] = true
 	claims["id"] = userID
-	claims["exp"] = time.Now().Add(time.Hour * 2).Unix() // Token expires after 2 hour
+	claims["exp"] = constants.EXPIRATION_TIME
 
 	tokenString, err := token.SignedString([]byte(JWT_SIGNATURE_KEY))
 	if err != nil {
@@ -34,4 +31,41 @@ func CreateToken(userID uint) (string, error) {
 		return "", err
 	}
 	return tokenString, nil
+}
+
+func ExtractTokenUserID(r *http.Request) (string, error) {
+
+	// get our token string from Cookie
+	biscuit, err := r.Cookie("token")
+
+	var tokenString string
+	if err != nil {
+		tokenString = ""
+	} else {
+		tokenString = biscuit.Value
+	}
+
+	// abort
+	if tokenString == "" {
+		return "", nil
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(JWT_SIGNATURE_KEY), nil
+	})
+	if err != nil {
+		return "", err
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if ok && token.Valid {
+		username := fmt.Sprintf("%v", claims["id"]) // convert to string
+		// if err != nil {
+		// 	return "", err
+		// }
+		return username, nil
+	}
+	return "", nil
 }
