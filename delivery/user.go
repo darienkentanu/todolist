@@ -3,8 +3,8 @@ package delivery
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
-	"todolist/constants"
 	"todolist/model"
 	"todolist/usecase"
 
@@ -19,6 +19,8 @@ func NewUserDelivery(r *mux.Router, uc usecase.UserUsecase) *userDelivery {
 	handler := userDelivery{uc: uc}
 	r.HandleFunc("/register", handler.Register).Methods("POST")
 	r.HandleFunc("/login", handler.Login).Methods("POST")
+	// r.Handle("/logout", middlewares.IsLoggedIn(r))
+	r.HandleFunc("/logout", handler.Logout).Methods("GET")
 	return &handler
 }
 
@@ -44,8 +46,8 @@ func (ud *userDelivery) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := ud.uc.Register(user)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		w.Write([]byte("internal server error"))
+		log.Println(err)
+		http.Error(w, "internal server error", http.StatusBadRequest)
 		return
 	}
 	json.NewEncoder(w).Encode(&u)
@@ -57,32 +59,56 @@ func (ud *userDelivery) Login(w http.ResponseWriter, r *http.Request) {
 	var login = model.Login{}
 	err := json.NewDecoder(r.Body).Decode(&login)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Println(err)
+		http.Error(w, "an error has been occured", 500)
 		return
 	}
 	if login.Email == "" {
-		http.Error(w, "please input a valid email", http.StatusBadRequest)
+		http.Error(w, "please input a valid email", 400)
 		return
 	}
 	if login.Password == "" {
-		http.Error(w, "please input a valid password", http.StatusBadRequest)
-		return
-	}
-	token, message, err := ud.uc.VerifyUserPassword(w, r, login.Email, login.Password)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		w.Write([]byte("invalid username or password"))
+		http.Error(w, "please input a valid password", 400)
 		return
 	}
 
-	cookie := &http.Cookie{
-		Name:    "token",
-		Value:   token,
-		Expires: constants.EXPIRATION_TIME,
+	userID, err := ud.uc.GetUserIDByEmail(login.Email)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "an error has been occured", 400)
+		return
 	}
+
+	err = ud.uc.VerifyUserPassword(w, r, login.Email, login.Password)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "invalid username or password", 400)
+		return
+	}
+
+	ud.uc.RemoveCookie(w)
+
+	token, err := ud.uc.CreateToken(userID)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "an error has been occured", 500)
+		return
+	}
+	cookie := ud.uc.CreateCookie(token)
 
 	http.SetCookie(w, cookie)
-	fmt.Fprintf(w, "login success %v", message)
+	fmt.Fprintf(w, "login success")
+}
 
-	// w.Write([]byte(token))
+func (ud *userDelivery) Logout(w http.ResponseWriter, r *http.Request) {
+	message := ud.uc.RemoveCookie(w)
+	log.Printf("logout success %v", message)
+	var response = struct {
+		Status  int
+		Message string
+	}{
+		200,
+		"logout success",
+	}
+	json.NewEncoder(w).Encode(&response)
 }
