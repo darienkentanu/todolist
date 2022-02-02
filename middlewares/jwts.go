@@ -75,7 +75,6 @@ func ExtractTokenUserID(r *http.Request) (uint, error) {
 
 func IsLoggedIn(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("middleware", r.URL)
 		cookie, err := r.Cookie("token")
 		if err != nil {
 			log.Println("unauthorized")
@@ -97,7 +96,6 @@ func IsLoggedIn(next http.Handler) http.Handler {
 			http.Error(w, "unauthorized", 404)
 			return
 		}
-		fmt.Println("==================================")
 		next.ServeHTTP(w, r)
 	})
 }

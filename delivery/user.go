@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"todolist/middlewares"
 	"todolist/model"
 	"todolist/usecase"
 
@@ -19,8 +20,10 @@ func NewUserDelivery(r *mux.Router, uc usecase.UserUsecase) *userDelivery {
 	handler := userDelivery{uc: uc}
 	r.HandleFunc("/register", handler.Register).Methods("POST")
 	r.HandleFunc("/login", handler.Login).Methods("POST")
-	// r.Handle("/logout", middlewares.IsLoggedIn(r))
-	r.HandleFunc("/logout", handler.Logout).Methods("GET")
+	getR := r.Methods("GET").Subrouter()
+	getR.Use(middlewares.IsLoggedIn)
+	getR.HandleFunc("/logout", handler.Logout)
+
 	return &handler
 }
 
