@@ -13,6 +13,11 @@ type UserRepo interface {
 	GetUserIDByEmail(email string) (uint, error)
 	GetPasswordHash(email string) (string, error)
 	// UpdateToken(email, token string) error
+	CheckCategory(input *model.Category) bool
+	AddCategory(input *model.Category) (output model.Category, err error)
+	AddTodo(input *model.Todo) (output model.Todo, err error)
+	SaveTodo(input *model.Todo) (output model.Todo, err error)
+	InsertTodoCategory(todoID uint, categoriesID []uint) error
 }
 
 type userRepo struct {
@@ -54,6 +59,62 @@ func (udb *userRepo) GetPasswordHash(email string) (string, error) {
 	}
 
 	return user.Password, nil
+}
+
+func (udb *userRepo) CheckCategory(input *model.Category) bool {
+	var output model.Category
+	if rows := udb.db.Where("name=?", input.Name).First(&output).RowsAffected; rows != 0 {
+		return true
+	}
+	return false
+}
+
+func (udb *userRepo) AddCategory(input *model.Category) (output model.Category, err error) {
+	if err := udb.db.Save(input).Error; err != nil {
+		return model.Category{}, err
+	}
+	if err = udb.db.Where("id=?", input.ID).First(&output).Error; err != nil {
+		return model.Category{}, err
+	}
+	return output, nil
+}
+
+func (udb *userRepo) AddTodo(input *model.Todo) (output model.Todo, err error) {
+	if err := udb.db.Save(input).Error; err != nil {
+		return model.Todo{}, err
+	}
+	if err := udb.db.Where("id=?", input.ID).First(&output).Error; err != nil {
+		return model.Todo{}, err
+	}
+	return output, nil
+}
+
+func (udb *userRepo) SaveTodo(input *model.Todo) (output model.Todo, err error) {
+	if err := udb.db.Save(input).Error; err != nil {
+		return output, err
+	}
+	if err := udb.db.Where("id=?", input.ID).First(&output).Error; err != nil {
+		return output, err
+	}
+	return output, nil
+}
+
+// type todo_category struct {
+// 	todo_id     uint `gorm:"primarykey"`
+// 	category_id uint `gorm:"primarykey"`
+// }
+
+func (udb *userRepo) InsertTodoCategory(todoID uint, categoriesID []uint) error {
+	for i := range categoriesID {
+		// var input = todo_category{
+		// 	todo_id:     todoID,
+		// 	category_id: categoriesID[i],
+		// }
+		if err := udb.db.Raw("insert into todo_category (todo_id, category_id) values (?,?)", todoID, categoriesID[i]).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // func (udb *UserDB) UpdateToken(email, token string) error {

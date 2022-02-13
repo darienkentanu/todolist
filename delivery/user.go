@@ -20,10 +20,14 @@ func NewUserDelivery(r *mux.Router, uc usecase.UserUsecase) *userDelivery {
 	handler := userDelivery{uc: uc}
 	r.HandleFunc("/register", handler.Register).Methods("POST")
 	r.HandleFunc("/login", handler.Login).Methods("POST")
+	// ----------------------------------------------------------------------
 	getR := r.Methods("GET").Subrouter()
 	getR.Use(middlewares.IsLoggedIn)
 	getR.HandleFunc("/logout", handler.Logout)
-
+	// ----------------------------------------------------------------------
+	postR := r.Methods("POST").Subrouter()
+	postR.Use(middlewares.IsLoggedIn)
+	postR.HandleFunc("/add", handler.AddTodo)
 	return &handler
 }
 
@@ -114,4 +118,34 @@ func (ud *userDelivery) Logout(w http.ResponseWriter, r *http.Request) {
 		"logout success",
 	}
 	json.NewEncoder(w).Encode(&response)
+}
+
+func (ud *userDelivery) AddTodo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	id, err := ud.uc.GetUserIDFromCookies(r)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "an error has been occured", 500)
+		return
+	}
+	input := new(model.Todo)
+	err = json.NewDecoder(r.Body).Decode(input)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	todos, err := ud.uc.ValidationForAddTodos(input, id)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	output, err := ud.uc.SaveTodo(todos, id)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "an error has been occured", 500)
+		return
+	}
+	json.NewEncoder(w).Encode(&output)
 }
